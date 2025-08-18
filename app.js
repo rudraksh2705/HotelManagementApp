@@ -12,4 +12,10 @@ app.use(morgan("dev"));
 app.use("/api/v1/users", UserRoutes);
 app.use("/api/v1/rooms", RoomRoutes);
 
+// app.all("*", (req, res, next) => {
+//   res.status(404).json({
+//     message: "Route Not Found",
+//   });
+// });
+
 module.exports = app;

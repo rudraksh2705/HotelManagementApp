@@ -1,8 +1,51 @@
 const User = require("../Models/RoomModel");
 const catchAsync = require("../Utils/catchAsync");
 
+class Features {
+  constructor(query, queryObj) {
+    this.query = query;
+    this.queryObj = queryObj;
+  }
+
+  filter() {
+    let obj = { ...this.queryObj };
+    const excludedFields = ["page", "sort", "limit"];
+    excludedFields.forEach((el) => delete obj[el]);
+
+    let queryStr = JSON.stringify(obj);
+    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+
+    this.query = this.query.find(JSON.parse(queryStr));
+    return this;
+  }
+
+  sort() {
+    if (this.queryObj.sort) {
+      this.query = this.query.sort(this.queryObj.sort.split(",").join(" "));
+    } else {
+      this.query = this.query.sort("Baseprice");
+    }
+    return this;
+  }
+
+  pagination() {
+    const page = this.queryObj.page * 1 || 1;
+    const limit = this.queryObj.limit * 1 || 5;
+    const skip = (page - 1) * limit;
+
+    this.query = this.query.skip(skip).limit(limit);
+    return this;
+  }
+}
+
 exports.getAllRooms = catchAsync(async (req, res) => {
-  const data = await User.find();
+  const features = new Features(User.find(), req.query)
+    .filter()
+    .sort()
+    .pagination();
+
+  const data = await features.query;
+
   res.status(201).json({
     status: "success",
     data,
