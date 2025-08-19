@@ -6,6 +6,8 @@ const Router = express.Router();
 
 Router.route("/forgetPassword").post(AuthController.forgetPassword);
 Router.route("/resetPassword/:resetToken").post(AuthController.resetPassword);
+Router.route("/updatePassword").post(AuthController.updatePassword);
+Router.route("/deleteAccount").post(AuthController.deleteMe);
 
 Router.route("/")
   .get(

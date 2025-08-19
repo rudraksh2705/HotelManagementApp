@@ -173,3 +173,86 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+//User is currently logged in
+exports.updatePassword = catchAsync(async (req, res, next) => {
+  if (
+    !req.headers.authorization ||
+    !req.headers.authorization.includes("Bearer")
+  ) {
+    return next(new AppError("User is currently not logged in", 401));
+  }
+
+  const token = req.headers.authorization.split(" ")[1];
+  try {
+    const decoded = await promisify(jwt.verify)(token, secret);
+    const user = await User.findById(decoded.id).select("+password");
+    if (!req.body.password) {
+      throw new Error("Password is not given");
+    }
+
+    const correct = await bcrypt.compare(req.body.password, user.password);
+    if (!correct) {
+      throw new Error("Password is incorrect");
+    } else {
+      user.password = await bcrypt.hash(req.body.newPassword, 10);
+      await user.save({ validateBeforeSave: false });
+
+      res.status(201).json({
+        status: "success",
+        message: "password Changed Successfully",
+        password: user.password,
+      });
+    }
+  } catch (err) {
+    res.status(401).json({
+      status: "error",
+      message: err.message,
+    });
+  }
+});
+
+exports.updateMe = catchAsync(async (req, res, next) => {
+  if (
+    !req.headers.authorization ||
+    !req.headers.authorization.includes("header")
+  ) {
+    return next(new AppError("You are not logged in", 401));
+  }
+
+  if (req.body.password || req.body.passwordConfirm) {
+    return next(new AppError("This route is not for updating password", 401));
+  }
+
+  const decoded = await promisify(json.verify)(token, secret);
+  const user = await User.findById(decoded.id);
+
+  user[req.body.field] = req.body.value;
+  await user.save();
+
+  res.status(200).json({
+    status: "success",
+    message: "Data updated",
+    user,
+  });
+});
+
+exports.deleteMe = catchAsync(async (req, res, next) => {
+  if (
+    !req.headers.authorization ||
+    !req.headers.authorization.includes("Bearer")
+  ) {
+    return next(new AppError("You are not logged in ", 401));
+  }
+  let user = "";
+  const token = req.headers.authorization.split(" ")[1];
+  const decoded = await promisify(jwt.verify)(token, secret);
+  user = await User.findById(decoded.id).select("+active");
+  user.active = false;
+  await user.save();
+
+  res.status(201).json({
+    status: "success",
+    message: "deleted",
+  });
+});
