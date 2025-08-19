@@ -1,7 +1,10 @@
+const { validate } = require("../Models/RoomModel");
 const User = require("../Models/UserModel");
+const AppError = require("../Utils/AppError");
 const catchAsync = require("../Utils/catchAsync");
 const jwt = require("jsonwebtoken");
 const { promisify } = require("util");
+const bcrypt = require("bcryptjs");
 
 const secret = process.env.jwt_secret;
 
@@ -72,10 +75,7 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
 
   if (!req.headers.authorization || !token) {
-    res.status(401).json({
-      status: "error",
-      message: "You are not logged in !",
-    });
+    return next(new AppError("You are not logged in !", 401));
   }
 
   try {
@@ -85,15 +85,91 @@ exports.protect = catchAsync(async (req, res, next) => {
       throw new Error("The user belonging to this token no longer exists.");
     }
     console.log(decoded.iat);
-    if (currentUser.changePassword(token.iat, currentUser)) {
+    if (changePassword(token.iat, currentUser)) {
       throw new Error("You recently changed your password , login again");
     }
     next();
   } catch (err) {
-    console.log(err);
+    return next(new AppError(err.message, 401));
+  }
+});
+
+exports.restrictTo = catchAsync(async (req, res, next) => {
+  console.log("Entered");
+  let token = "";
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.includes("Bearer")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
+  }
+  console.log(token);
+  if (!token) {
+    return next(new AppError("User is currently not logged in", 401));
+  }
+
+  try {
+    const decoded = await promisify(jwt.verify)(token, secret);
+    const user = await User.findById(decoded.id);
+    console.log(user);
+    if (user.role === "Admin") next();
+    else throw new Error("You can't access this service");
+  } catch (err) {
     res.status(401).json({
-      status: "fail",
-      message: err,
+      status: "error",
+      message: err.message,
+    });
+  }
+});
+
+exports.forgetPassword = catchAsync(async (req, res, next) => {
+  if (!req.body.email) {
+    return next(new AppError("Email is required", 401));
+  }
+
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) {
+    return next(
+      new AppError(`User not found with mail id ${req.body.email} `, 401)
+    );
+  }
+
+  user.save({ validateBeforeSave: false });
+
+  const resetToken = user.createResetToken();
+
+  const resetUrl = `${req.protocol}://${req.get(
+    "host"
+  )}/api/v1/users/resetPassword/${resetToken}`;
+
+  const message = `Forgot your password? Submit a PATCH request with your new password and passwordConfirm to: ${resetUrl}\nIf you didn't forget your password, please ignore this email!`;
+
+  res.status(200).json({
+    status: "success",
+    message: "Token sent to email!",
+    resetToken,
+  });
+});
+
+exports.resetPassword = catchAsync(async (req, res, next) => {
+  const resetToken = req.params.resetToken;
+  const user = await User.findOne({ passwordResetToken: resetToken });
+
+  if (!user || user.passwordResetTokenExpires < Date.now()) {
+    return next(new AppError("You reset Token has expired", 401));
+  }
+
+  console.log(user);
+  if (!req.body.newPassword) {
+    return next(new AppError("New Password not given", 401));
+  }
+  if (req.body.newPassword) {
+    user.password = await bcrypt.hash(req.body.newPassword, 10);
+    await user.save({ validateBeforeSave: false });
+    res.status(201).json({
+      status: "success",
+      message: "Password Updated Successfuly",
+      Hashedpassword: user.password,
     });
   }
 });
