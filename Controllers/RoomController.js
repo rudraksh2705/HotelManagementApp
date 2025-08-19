@@ -1,4 +1,4 @@
-const User = require("../Models/RoomModel");
+const Room = require("../Models/RoomModel");
 const catchAsync = require("../Utils/catchAsync");
 
 class Features {
@@ -39,7 +39,7 @@ class Features {
 }
 
 exports.getAllRooms = catchAsync(async (req, res) => {
-  const features = new Features(User.find(), req.query)
+  const features = new Features(Room.find(), req.query)
     .filter()
     .sort()
     .pagination();
@@ -53,7 +53,7 @@ exports.getAllRooms = catchAsync(async (req, res) => {
 });
 
 exports.CreateRooms = catchAsync(async (req, res) => {
-  const newdata = await User.create(req.body);
+  const newdata = await Room.create(req.body);
   res.status(200).json({
     status: "success",
     data: newdata,
@@ -63,7 +63,7 @@ exports.CreateRooms = catchAsync(async (req, res) => {
 exports.deleteRoom = catchAsync(async (req, res) => {
   const id = req.params.id;
   console.log(id);
-  await User.deleteOne({ _id: id });
+  await Room.deleteOne({ _id: id });
   res.status(204).json({
     status: "success",
   });
@@ -71,22 +71,22 @@ exports.deleteRoom = catchAsync(async (req, res) => {
 
 exports.UpdateField = catchAsync(async (req, res) => {
   const id = req.params.id;
-  const user = await User.findOne({ _id: id });
+  const room = await Room.findOne({ _id: id });
   const field = req.body.field;
   const value = req.body.value;
-  user[field] = value;
-  await user.save();
+  room[field] = value;
+  await room.save();
   res.status(201).json({
     status: "success",
-    user,
+    room,
   });
 });
 
 exports.getRoom = catchAsync(async (req, res) => {
   const id = req.params.id;
-  const user = await User.findOne({ _id: id });
+  const room = await Room.findOne({ _id: id });
   res.status(201).json({
     status: "success",
-    user,
+    room,
   });
 });
